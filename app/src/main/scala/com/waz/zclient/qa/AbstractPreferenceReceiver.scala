@@ -25,11 +25,14 @@ import com.waz.content.Preferences.PrefKey
 import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.UserPreferences._
 import com.waz.service.ZMessaging
+import com.waz.zclient.{BuildConfig, WireApplication}
 import com.waz.zclient.controllers.userpreferences.IUserPreferencesController._
 import com.waz.zclient.controllers.userpreferences.UserPreferencesController
 import com.waz.zclient.controllers.userpreferences.UserPreferencesController._
 import com.waz.zclient.tracking.GlobalTrackingController
-import com.waz.zclient.{BuildConfig, WireApplication}
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 trait AbstractPreferenceReceiver extends BroadcastReceiver {
 
@@ -40,6 +43,12 @@ trait AbstractPreferenceReceiver extends BroadcastReceiver {
     val globalPrefs = ZMessaging.globalModule.map(_.prefs)
     globalPrefs.map(_.preference(preference) := value)
     setResultCode(Activity.RESULT_OK)
+  }
+
+  def getGlobalPref[K: PrefCodec](preference: PrefKey[K]): String = {
+    val globalPrefs = ZMessaging.globalModule.map(_.prefs)
+    val pref = globalPrefs.flatMap(_.preference(preference).apply())
+    Await.result(pref, 5.seconds)
   }
 
   def setUserPref[K: PrefCodec](userPref: PrefKey[K], value: K): Unit = {
