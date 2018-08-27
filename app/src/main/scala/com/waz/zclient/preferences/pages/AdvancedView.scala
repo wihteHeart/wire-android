@@ -18,13 +18,15 @@
 package com.waz.zclient.preferences.pages
 
 import android.app.Activity
-import android.content.Context
+import android.content.{Context, Intent}
+import android.net.Uri
 import android.os.Bundle
 import android.util.AttributeSet
 import android.view.View
 import android.widget.{LinearLayout, Toast}
 import com.waz.service.ZMessaging
 import com.waz.threading.{CancellableFuture, Threading}
+import com.waz.utils.returning
 import com.waz.zclient.preferences.views.TextButton
 import com.waz.zclient.utils.ContextUtils._
 import com.waz.zclient.utils.{BackStackKey, DebugUtils}
@@ -39,24 +41,32 @@ class AdvancedViewImpl(context: Context, attrs: AttributeSet, style: Int) extend
 
   inflate(R.layout.preferences_advanced_layout)
 
-  val submitReport = findById[TextButton](R.id.preferences_debug_report)
-  val resetPush = findById[TextButton](R.id.preferences_reset_push)
-
-  submitReport.onClickEvent { _ =>
-    DebugUtils.sendDebugReport(context.asInstanceOf[Activity])
+  val submitReport = returning(findById[TextButton](R.id.preferences_debug_report)) { button =>
+    button.onClickEvent { _ =>
+      DebugUtils.sendDebugReport(context.asInstanceOf[Activity])
+    }
   }
 
-  resetPush.onClickEvent { _ =>
-    ZMessaging.currentGlobal.tokenService.resetGlobalToken()
-    Toast.makeText(getContext, getString(R.string.pref_advanced_reset_push_completed)(getContext), Toast.LENGTH_LONG).show()
-    setResetEnabled(false)
-    CancellableFuture.delay(5.seconds).map(_ => setResetEnabled(true))(Threading.Ui)
+  val resetPush = returning(findById[TextButton](R.id.preferences_reset_push)) { button =>
+    def setResetEnabled(enabled: Boolean) = {
+      button.setEnabled(enabled)
+      button.setAlpha(if (enabled) 1.0f else 0.5f)
+    }
+
+    button.onClickEvent { _ =>
+      ZMessaging.currentGlobal.tokenService.resetGlobalToken()
+      Toast.makeText(getContext, getString(R.string.pref_advanced_reset_push_completed)(getContext), Toast.LENGTH_LONG).show()
+      setResetEnabled(false)
+      CancellableFuture.delay(5.seconds).map(_ => setResetEnabled(true))(Threading.Ui)
+    }
   }
 
-  private def setResetEnabled(enabled: Boolean) = {
-    resetPush.setEnabled(enabled)
-    resetPush.setAlpha(if (enabled) 1.0f else 0.5f)
+  val notificationsWebpage = returning(findById[TextButton](R.id.preferences_notifications_webpage)) { button =>
+    button.onClickEvent { _ =>
+      context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(context.getString(R.string.pref_advanced_notifications_webpage_url))))
+    }
   }
+
 }
 
 case class AdvancedBackStackKey(args: Bundle = new Bundle()) extends BackStackKey(args) {
